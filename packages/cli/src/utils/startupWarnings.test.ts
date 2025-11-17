@@ -4,73 +4,77 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getStartupWarnings } from './startupWarnings.js';
-import * as fs from 'node:fs/promises';
-import { getErrorMessage } from '@google/gemini-cli-core';
-
-vi.mock('node:fs/promises', { spy: true });
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    getErrorMessage: vi.fn(),
-  };
-});
+import { describe, it, expect, afterEach } from 'vitest';
+import { getStartupWarnings, WARNINGS_FILE_PATH } from './startupWarnings.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 describe('startupWarnings', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
+  afterEach(() => {
+    // Robust cleanup to ensure atomicity
+    if (fs.existsSync(WARNINGS_FILE_PATH)) {
+      try {
+        // Ensure file is writable before deleting
+        fs.chmodSync(WARNINGS_FILE_PATH, 0o600);
+      } catch {
+        // Ignore errors if chmod fails (e.g., file owned by another user)
+      }
+      // Ensure parent dir is writable before deleting
+      const dir = path.dirname(WARNINGS_FILE_PATH);
+      try {
+        fs.chmodSync(dir, 0o700);
+      } catch {
+        // Ignore errors
+      }
+      fs.rmSync(WARNINGS_FILE_PATH, { force: true });
+    }
   });
 
   it('should return warnings from the file and delete it', async () => {
     const mockWarnings = 'Warning 1\nWarning 2';
-    vi.mocked(fs.access).mockResolvedValue();
-    vi.mocked(fs.readFile).mockResolvedValue(mockWarnings);
-    vi.mocked(fs.unlink).mockResolvedValue();
+    fs.writeFileSync(WARNINGS_FILE_PATH, mockWarnings);
 
     const warnings = await getStartupWarnings();
 
-    expect(fs.access).toHaveBeenCalled();
-    expect(fs.readFile).toHaveBeenCalled();
-    expect(fs.unlink).toHaveBeenCalled();
     expect(warnings).toEqual(['Warning 1', 'Warning 2']);
+    expect(fs.existsSync(WARNINGS_FILE_PATH)).toBe(false);
   });
 
   it('should return an empty array if the file does not exist', async () => {
-    const error = new Error('File not found');
-    (error as Error & { code: string }).code = 'ENOENT';
-    vi.mocked(fs.access).mockRejectedValue(error);
-
     const warnings = await getStartupWarnings();
-
     expect(warnings).toEqual([]);
   });
 
   it('should return an error message if reading the file fails', async () => {
-    const error = new Error('Permission denied');
-    vi.mocked(fs.access).mockRejectedValue(error);
-    vi.mocked(getErrorMessage).mockReturnValue('Permission denied');
+    fs.writeFileSync(WARNINGS_FILE_PATH, 'Warnings');
+    fs.chmodSync(WARNINGS_FILE_PATH, 0o000); // Make file unreadable
 
     const warnings = await getStartupWarnings();
-
-    expect(warnings).toEqual([
-      'Error checking/reading warnings file: Permission denied',
-    ]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(
+      'Error checking/reading warnings file: EACCES: permission denied',
+    );
   });
 
   it('should return a warning if deleting the file fails', async () => {
     const mockWarnings = 'Warning 1';
-    vi.mocked(fs.access).mockResolvedValue();
-    vi.mocked(fs.readFile).mockResolvedValue(mockWarnings);
-    vi.mocked(fs.unlink).mockRejectedValue(new Error('Permission denied'));
+    fs.writeFileSync(WARNINGS_FILE_PATH, mockWarnings);
+    const dir = path.dirname(WARNINGS_FILE_PATH);
 
-    const warnings = await getStartupWarnings();
+    try {
+      fs.chmodSync(dir, 0o500); // Make directory read-only to prevent deletion
 
-    expect(warnings).toEqual([
-      'Warning 1',
-      'Warning: Could not delete temporary warnings file.',
-    ]);
+      const warnings = await getStartupWarnings();
+
+      expect(warnings).toEqual([
+        'Warning 1',
+        'Warning: Could not delete temporary warnings file.',
+      ]);
+      // File should still exist because the deletion failed
+      expect(fs.existsSync(WARNINGS_FILE_PATH)).toBe(true);
+    } finally {
+      // Restore permissions immediately to ensure atomicity
+      fs.chmodSync(dir, 0o700);
+    }
   });
 });

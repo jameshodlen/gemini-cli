@@ -9,17 +9,20 @@ import os from 'node:os';
 import { join as pathJoin } from 'node:path';
 import { getErrorMessage } from '@google/gemini-cli-core';
 
-const warningsFilePath = pathJoin(os.tmpdir(), 'gemini-cli-warnings.txt');
+export const WARNINGS_FILE_PATH = pathJoin(
+  os.tmpdir(),
+  'gemini-cli-warnings.txt',
+);
 
 export async function getStartupWarnings(): Promise<string[]> {
   try {
-    await fs.access(warningsFilePath); // Check if file exists
-    const warningsContent = await fs.readFile(warningsFilePath, 'utf-8');
+    await fs.access(WARNINGS_FILE_PATH); // Check if file exists
+    const warningsContent = await fs.readFile(WARNINGS_FILE_PATH, 'utf-8');
     const warnings = warningsContent
       .split('\n')
       .filter((line) => line.trim() !== '');
     try {
-      await fs.unlink(warningsFilePath);
+      await fs.unlink(WARNINGS_FILE_PATH);
     } catch {
       warnings.push('Warning: Could not delete temporary warnings file.');
     }
