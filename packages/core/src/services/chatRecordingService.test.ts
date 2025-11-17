@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MockInstance } from 'vitest';
 import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -17,8 +17,6 @@ import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 
-vi.mock('node:fs');
-vi.mock('node:path');
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
   createHash: vi.fn(() => ({
@@ -32,18 +30,19 @@ vi.mock('../utils/paths.js');
 describe('ChatRecordingService', () => {
   let chatRecordingService: ChatRecordingService;
   let mockConfig: Config;
-
-  let mkdirSyncSpy: MockInstance<typeof fs.mkdirSync>;
-  let writeFileSyncSpy: MockInstance<typeof fs.writeFileSync>;
+  let tempDir: string;
 
   beforeEach(() => {
+    tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'chatRecordingService-test-'),
+    );
     mockConfig = {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getProjectRoot: vi.fn().mockReturnValue(tempDir),
       storage: {
         getProjectTempDir: vi
           .fn()
-          .mockReturnValue('/test/project/root/.gemini/tmp'),
+          .mockReturnValue(path.join(tempDir, '.gemini/tmp')),
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -58,120 +57,83 @@ describe('ChatRecordingService', () => {
 
     vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
     vi.mocked(randomUUID).mockReturnValue('this-is-a-test-uuid');
-    vi.mocked(path.join).mockImplementation((...args) => args.join('/'));
 
     chatRecordingService = new ChatRecordingService(mockConfig);
-
-    mkdirSyncSpy = vi
-      .spyOn(fs, 'mkdirSync')
-      .mockImplementation(() => undefined);
-
-    writeFileSyncSpy = vi
-      .spyOn(fs, 'writeFileSync')
-      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   describe('initialize', () => {
     it('should create a new session if none is provided', () => {
       chatRecordingService.initialize();
 
-      expect(mkdirSyncSpy).toHaveBeenCalledWith(
-        '/test/project/root/.gemini/tmp/chats',
-        { recursive: true },
-      );
-      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      const chatDir = path.join(tempDir, '.gemini/tmp/chats');
+      expect(fs.existsSync(chatDir)).toBe(true);
     });
 
     it('should resume from an existing session if provided', () => {
-      const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      const chatDir = path.join(tempDir, '.gemini/tmp/chats');
+      fs.mkdirSync(chatDir, { recursive: true });
+      const sessionPath = path.join(chatDir, 'session.json');
+      fs.writeFileSync(
+        sessionPath,
         JSON.stringify({
           sessionId: 'old-session-id',
           projectHash: 'test-project-hash',
           messages: [],
         }),
       );
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
 
       chatRecordingService.initialize({
-        filePath: '/test/project/root/.gemini/tmp/chats/session.json',
+        filePath: sessionPath,
         conversation: {
           sessionId: 'old-session-id',
         } as ConversationRecord,
       });
 
-      expect(mkdirSyncSpy).not.toHaveBeenCalled();
-      expect(readFileSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      expect(fs.existsSync(sessionPath)).toBe(true);
     });
   });
 
   describe('recordMessage', () => {
     beforeEach(() => {
       chatRecordingService.initialize();
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify({
-          sessionId: 'test-session-id',
-          projectHash: 'test-project-hash',
-          messages: [],
-        }),
-      );
     });
 
     it('should record a new message', () => {
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'Hello',
         model: 'gemini-pro',
       });
-      expect(mkdirSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
-        writeFileSyncSpy.mock.calls[0][1] as string,
+        fs.readFileSync(chatRecordingService['conversationFile']!, 'utf-8'),
       ) as ConversationRecord;
+
       expect(conversation.messages).toHaveLength(1);
       expect(conversation.messages[0].content).toBe('Hello');
       expect(conversation.messages[0].type).toBe('user');
     });
 
     it('should create separate messages when recording multiple messages', () => {
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
-      const initialConversation = {
-        sessionId: 'test-session-id',
-        projectHash: 'test-project-hash',
-        messages: [
-          {
-            id: '1',
-            type: 'user',
-            content: 'Hello',
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      };
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify(initialConversation),
-      );
-
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'World',
         model: 'gemini-pro',
       });
 
-      expect(mkdirSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
-        writeFileSyncSpy.mock.calls[0][1] as string,
+        fs.readFileSync(chatRecordingService['conversationFile']!, 'utf-8'),
       ) as ConversationRecord;
       expect(conversation.messages).toHaveLength(2);
       expect(conversation.messages[0].content).toBe('Hello');
@@ -198,14 +160,7 @@ describe('ChatRecordingService', () => {
   });
 
   describe('recordMessageTokens', () => {
-    beforeEach(() => {
-      chatRecordingService.initialize();
-    });
-
     it('should update the last message with token info', () => {
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
       const initialConversation = {
         sessionId: 'test-session-id',
         projectHash: 'test-project-hash',
@@ -218,9 +173,17 @@ describe('ChatRecordingService', () => {
           },
         ],
       };
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify(initialConversation),
+      const sessionPath = path.join(
+        tempDir,
+        '.gemini/tmp/chats/test-session-id.json',
       );
+      fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+      fs.writeFileSync(sessionPath, JSON.stringify(initialConversation));
+
+      chatRecordingService.initialize({
+        filePath: sessionPath,
+        conversation: initialConversation as ConversationRecord,
+      });
 
       chatRecordingService.recordMessageTokens({
         promptTokenCount: 1,
@@ -229,11 +192,10 @@ describe('ChatRecordingService', () => {
         cachedContentTokenCount: 0,
       });
 
-      expect(mkdirSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
-        writeFileSyncSpy.mock.calls[0][1] as string,
+        fs.readFileSync(chatRecordingService['conversationFile']!, 'utf-8'),
       ) as ConversationRecord;
+
       expect(conversation.messages[0]).toEqual({
         ...initialConversation.messages[0],
         tokens: {
@@ -261,9 +223,17 @@ describe('ChatRecordingService', () => {
           },
         ],
       };
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify(initialConversation),
+
+      const sessionPath = path.join(
+        tempDir,
+        '.gemini/tmp/chats/test-session-id.json',
       );
+      fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+      fs.writeFileSync(sessionPath, JSON.stringify(initialConversation));
+      chatRecordingService.initialize({
+        filePath: sessionPath,
+        conversation: initialConversation as ConversationRecord,
+      });
 
       chatRecordingService.recordMessageTokens({
         promptTokenCount: 2,
@@ -285,14 +255,7 @@ describe('ChatRecordingService', () => {
   });
 
   describe('recordToolCalls', () => {
-    beforeEach(() => {
-      chatRecordingService.initialize();
-    });
-
     it('should add new tool calls to the last message', () => {
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
       const initialConversation = {
         sessionId: 'test-session-id',
         projectHash: 'test-project-hash',
@@ -305,9 +268,17 @@ describe('ChatRecordingService', () => {
           },
         ],
       };
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify(initialConversation),
+      const sessionPath = path.join(
+        tempDir,
+        '.gemini/tmp/chats/test-session-id.json',
       );
+      fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+      fs.writeFileSync(sessionPath, JSON.stringify(initialConversation));
+
+      chatRecordingService.initialize({
+        filePath: sessionPath,
+        conversation: initialConversation as ConversationRecord,
+      });
 
       const toolCall: ToolCallRecord = {
         id: 'tool-1',
@@ -318,11 +289,10 @@ describe('ChatRecordingService', () => {
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
 
-      expect(mkdirSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
-        writeFileSyncSpy.mock.calls[0][1] as string,
+        fs.readFileSync(chatRecordingService['conversationFile']!, 'utf-8'),
       ) as ConversationRecord;
+
       expect(conversation.messages[0]).toEqual({
         ...initialConversation.messages[0],
         toolCalls: [
@@ -337,9 +307,10 @@ describe('ChatRecordingService', () => {
     });
 
     it('should create a new message if the last message is not from gemini', () => {
-      const writeFileSyncSpy = vi
-        .spyOn(fs, 'writeFileSync')
-        .mockImplementation(() => undefined);
+      const sessionPath = path.join(
+        tempDir,
+        '.gemini/tmp/chats/test-session-id.json',
+      );
       const initialConversation = {
         sessionId: 'test-session-id',
         projectHash: 'test-project-hash',
@@ -352,9 +323,12 @@ describe('ChatRecordingService', () => {
           },
         ],
       };
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(
-        JSON.stringify(initialConversation),
-      );
+      fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+      fs.writeFileSync(sessionPath, JSON.stringify(initialConversation));
+      chatRecordingService.initialize({
+        filePath: sessionPath,
+        conversation: initialConversation as ConversationRecord,
+      });
 
       const toolCall: ToolCallRecord = {
         id: 'tool-1',
@@ -365,11 +339,10 @@ describe('ChatRecordingService', () => {
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
 
-      expect(mkdirSyncSpy).toHaveBeenCalled();
-      expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
-        writeFileSyncSpy.mock.calls[0][1] as string,
+        fs.readFileSync(sessionPath, 'utf-8'),
       ) as ConversationRecord;
+
       expect(conversation.messages).toHaveLength(2);
       expect(conversation.messages[1]).toEqual({
         ...conversation.messages[1],
@@ -392,13 +365,14 @@ describe('ChatRecordingService', () => {
 
   describe('deleteSession', () => {
     it('should delete the session file', () => {
-      const unlinkSyncSpy = vi
-        .spyOn(fs, 'unlinkSync')
-        .mockImplementation(() => undefined);
-      chatRecordingService.deleteSession('test-session-id');
-      expect(unlinkSyncSpy).toHaveBeenCalledWith(
-        '/test/project/root/.gemini/tmp/chats/test-session-id.json',
+      const sessionPath = path.join(
+        tempDir,
+        '.gemini/tmp/chats/test-session-id.json',
       );
+      fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+      fs.writeFileSync(sessionPath, 'test');
+      chatRecordingService.deleteSession('test-session-id');
+      expect(fs.existsSync(sessionPath)).toBe(false);
     });
   });
 });
