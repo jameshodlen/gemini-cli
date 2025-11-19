@@ -41,6 +41,7 @@ import {
   UserPromptEvent,
   debugLogger,
   recordSlowRender,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -77,6 +78,14 @@ import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import ansiEscapes from 'ansi-escapes';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import {
+  createInkStdio,
+  patchStdio,
+  writeToStderr,
+  writeToStdout,
+} from './utils/stdio.js';
+
+import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -175,6 +184,20 @@ export async function startInteractiveUI(
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
+  const cleanupStdio = patchStdio(debugLogger);
+  registerCleanup(cleanupStdio);
+
+  const consolePatcher = new ConsolePatcher({
+    onNewMessage: (msg) => {
+      coreEvents.emitConsoleLog(msg.type, msg.content);
+    },
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
+  registerCleanup(consolePatcher.cleanup);
+
+  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
@@ -218,13 +241,18 @@ export async function startInteractiveUI(
       <AppWrapper />
     ),
     {
+      stdout: inkStdout,
+      stderr: inkStderr,
+      stdin: process.stdin,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
           recordSlowRender(config, renderTime);
         }
+        profiler.reportFrameRendered();
       },
+      patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
         settings.merged.ui?.incrementalRendering !== false &&
@@ -266,8 +294,8 @@ export async function main() {
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    debugLogger.error(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
+    writeToStderr(
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
     );
     process.exit(1);
   }
@@ -436,7 +464,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       if (isAlternateBufferEnabled(settings)) {
-        process.stdout.write(ansiEscapes.enterAlternativeScreen);
+        writeToStdout(ansiEscapes.enterAlternativeScreen);
 
         // Ink will cleanup so there is no need for us to manually cleanup.
       }
@@ -567,10 +595,10 @@ export async function main() {
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
     const windowTitle = computeWindowTitle(title);
-    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
+    writeToStdout(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      process.stdout.write(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]2;\x07`);
     });
   }
 }

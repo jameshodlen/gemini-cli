@@ -12,10 +12,14 @@ import {
   useTransition,
 } from 'react';
 import type { ConsoleMessageItem } from '../types.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type ConsoleLogPayload,
+} from '@google/gemini-cli-core';
 
 export interface UseConsoleMessagesReturn {
   consoleMessages: ConsoleMessageItem[];
-  handleNewMessage: (message: ConsoleMessageItem) => void;
   clearConsoleMessages: () => void;
 }
 
@@ -85,6 +89,21 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
     [processQueue],
   );
 
+  useEffect(() => {
+    const handleConsoleLog = (payload: ConsoleLogPayload) => {
+      handleNewMessage({
+        type: payload.type,
+        content: payload.content,
+        count: 1,
+      });
+    };
+
+    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+    return () => {
+      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+    };
+  }, [handleNewMessage]);
+
   const clearConsoleMessages = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -106,5 +125,5 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
     [],
   );
 
-  return { consoleMessages, handleNewMessage, clearConsoleMessages };
+  return { consoleMessages, clearConsoleMessages };
 }

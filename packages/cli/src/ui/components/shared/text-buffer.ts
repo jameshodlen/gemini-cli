@@ -20,6 +20,9 @@ import {
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { writeToStdout } from '../../../utils/stdio.js';
+import ansiEscapes from 'ansi-escapes';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 export type Direction =
   | 'left'
@@ -1589,6 +1592,7 @@ export function useTextBuffer({
     visualLayout,
   } = state;
 
+  const isAlternateBufferEnabled = useAlternateBuffer();
   const text = useMemo(() => lines.join('\n'), [lines]);
 
   const visualCursor = useMemo(
@@ -1892,6 +1896,10 @@ export function useTextBuffer({
         console.error('[useTextBuffer] external editor error', err);
       } finally {
         if (wasRaw) setRawMode?.(true);
+        if (isAlternateBufferEnabled) {
+          // The editor may have left alternate buffer mode.
+          writeToStdout(ansiEscapes.enterAlternativeScreen);
+        }
         try {
           fs.unlinkSync(filePath);
         } catch {
@@ -1904,7 +1912,7 @@ export function useTextBuffer({
         }
       }
     },
-    [text, stdin, setRawMode],
+    [text, stdin, setRawMode, isAlternateBufferEnabled],
   );
 
   const handleInput = useCallback(

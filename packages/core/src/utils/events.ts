@@ -55,6 +55,14 @@ export interface ModelChangedPayload {
 }
 
 /**
+ * Payload for the 'console-log' event.
+ */
+export interface ConsoleLogPayload {
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
+  content: string;
+}
+
+/**
  * Payload for the 'memory-changed' event.
  */
 export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
@@ -63,6 +71,7 @@ export enum CoreEvent {
   UserFeedback = 'user-feedback',
   FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
+  ConsoleLog = 'console-log',
   MemoryChanged = 'memory-changed',
 }
 
@@ -70,6 +79,7 @@ export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
 }
 
@@ -100,6 +110,17 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     } else {
       this.emit(CoreEvent.UserFeedback, payload);
     }
+  }
+
+  /**
+   * Broadcasts a console log message.
+   */
+  emitConsoleLog(
+    type: 'log' | 'warn' | 'error' | 'debug' | 'info',
+    content: string,
+  ): void {
+    const payload: ConsoleLogPayload = { type, content };
+    this.emit(CoreEvent.ConsoleLog, payload);
   }
 
   /**

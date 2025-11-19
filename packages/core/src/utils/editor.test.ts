@@ -22,6 +22,7 @@ import {
   type EditorType,
 } from './editor.js';
 import { execSync, spawn, spawnSync } from 'node:child_process';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
@@ -402,7 +403,7 @@ describe('editor utils', () => {
 
     it('should log an error if diff command is not available', async () => {
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       // @ts-expect-error Testing unsupported editor
       await openDiff('old.txt', 'new.txt', 'foobar', () => {});

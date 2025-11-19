@@ -21,6 +21,7 @@ export const FRAME_TIMESTAMP_CAPACITY = 2048;
 
 // Exported for testing purposes.
 export const profiler = {
+  profilersActive: 0,
   numFrames: 0,
   totalIdleFrames: 0,
   totalFlickerFrames: 0,
@@ -47,25 +48,25 @@ export const profiler = {
   },
 
   reportFrameRendered() {
+    if (this.profilersActive === 0) {
+      return;
+    }
     const now = Date.now();
-    // Simple frame detection logic (a write after at least 16ms is a new frame)
-    if (now - this.lastFrameStartTime > 16) {
-      this.lastFrameStartTime = now;
-      this.numFrames++;
-      if (debugState.debugNumAnimatedComponents === 0) {
-        if (this.possiblyIdleFrameTimestamps.size >= FRAME_TIMESTAMP_CAPACITY) {
-          this.possiblyIdleFrameTimestamps.shift();
-        }
-        this.possiblyIdleFrameTimestamps.push(now);
-      } else {
-        // If a spinner is present, consider this an action that both prevents
-        // this frame from being idle and also should prevent a follow on frame
-        // from being considered idle.
-        if (this.actionTimestamps.size >= ACTION_TIMESTAMP_CAPACITY) {
-          this.actionTimestamps.shift();
-        }
-        this.actionTimestamps.push(now);
+    this.lastFrameStartTime = now;
+    this.numFrames++;
+    if (debugState.debugNumAnimatedComponents === 0) {
+      if (this.possiblyIdleFrameTimestamps.size >= FRAME_TIMESTAMP_CAPACITY) {
+        this.possiblyIdleFrameTimestamps.shift();
       }
+      this.possiblyIdleFrameTimestamps.push(now);
+    } else {
+      // If a spinner is present, consider this an action that both prevents
+      // this frame from being idle and also should prevent a follow on frame
+      // from being considered idle.
+      if (this.actionTimestamps.size >= ACTION_TIMESTAMP_CAPACITY) {
+        this.actionTimestamps.shift();
+      }
+      this.actionTimestamps.push(now);
     }
   },
 
@@ -149,6 +150,7 @@ export const DebugProfiler = () => {
 
   // Effect for listening to stdin for keypresses and stdout for resize events.
   useEffect(() => {
+    profiler.profilersActive++;
     const stdin = process.stdin;
     const stdout = process.stdout;
 
@@ -162,31 +164,7 @@ export const DebugProfiler = () => {
     return () => {
       stdin.off('data', handler);
       stdout.off('resize', handler);
-    };
-  }, []);
-
-  // Effect for patching stdout to count frames and detect idle ones
-  useEffect(() => {
-    const originalWrite = process.stdout.write;
-    const boundOriginalWrite = originalWrite.bind(process.stdout);
-
-    process.stdout.write = (
-      chunk: Uint8Array | string,
-      encodingOrCb?:
-        | BufferEncoding
-        | ((err?: NodeJS.ErrnoException | null) => void),
-      cb?: (err?: NodeJS.ErrnoException | null) => void,
-    ) => {
-      profiler.reportFrameRendered();
-
-      if (typeof encodingOrCb === 'function') {
-        return boundOriginalWrite(chunk, encodingOrCb);
-      }
-      return boundOriginalWrite(chunk, encodingOrCb, cb);
-    };
-
-    return () => {
-      process.stdout.write = originalWrite;
+      profiler.profilersActive--;
     };
   }, []);
 

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { writeToStdout } from '../../utils/stdio.js';
+
 let detectionComplete = false;
 let protocolSupported = false;
 let protocolEnabled = false;
@@ -74,14 +76,14 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
 
         if (progressiveEnhancementReceived) {
           // Enable the protocol
-          process.stdout.write('\x1b[>1u');
+          writeToStdout('\x1b[>1u');
           protocolSupported = true;
           protocolEnabled = true;
         }
 
         // Broaden mouse support by enabling SGR mode if we get any device
         // attribute response, which is a strong signal of a modern terminal.
-        process.stdout.write('\x1b[?1006h');
+        writeToStdout('\x1b[?1006h');
         sgrMouseEnabled = true;
 
         // Set up cleanup on exit for all enabled protocols
@@ -96,8 +98,8 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
     process.stdin.on('data', handleData);
 
     // Send queries
-    process.stdout.write('\x1b[?u'); // Query progressive enhancement
-    process.stdout.write('\x1b[c'); // Query device attributes
+    writeToStdout('\x1b[?u'); // Query progressive enhancement
+    writeToStdout('\x1b[c'); // Query device attributes
 
     // Timeout after 200ms
     // When a iterm2 terminal does not have focus this can take over 90s on a
@@ -108,11 +110,11 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
 
 function disableAllProtocols() {
   if (protocolEnabled) {
-    process.stdout.write('\x1b[<u');
+    writeToStdout('\x1b[<u');
     protocolEnabled = false;
   }
   if (sgrMouseEnabled) {
-    process.stdout.write('\x1b[?1006l'); // Disable SGR Mouse
+    writeToStdout('\x1b[?1006l'); // Disable SGR Mouse
     sgrMouseEnabled = false;
   }
 }

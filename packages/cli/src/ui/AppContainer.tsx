@@ -91,7 +91,6 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -110,6 +109,7 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
+import { writeToStdout } from '../utils/stdio.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -300,20 +300,8 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [getEffectiveModel]);
 
-  const {
-    consoleMessages,
-    handleNewMessage,
-    clearConsoleMessages: clearConsoleMessagesState,
-  } = useConsoleMessages();
-
-  useEffect(() => {
-    const consolePatcher = new ConsolePatcher({
-      onNewMessage: handleNewMessage,
-      debugMode: config.getDebugMode(),
-    });
-    consolePatcher.patch();
-    registerCleanup(consolePatcher.cleanup);
-  }, [handleNewMessage, config]);
+  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
+    useConsoleMessages();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
   // Derive widths for InputPrompt using shared helper
@@ -374,10 +362,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
-      stdout.write(ansiEscapes.clearTerminal);
+      writeToStdout(ansiEscapes.clearTerminal);
     }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout, isAlternateBuffer]);
+  }, [setHistoryRemountKey, isAlternateBuffer]);
 
   const {
     isThemeDialogOpen,
@@ -1003,11 +991,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 
     const logErrorHandler = (errorMessage: unknown) => {
-      handleNewMessage({
-        type: 'error',
-        content: String(errorMessage),
-        count: 1,
-      });
+      coreEvents.emitConsoleLog('error', String(errorMessage));
     };
     appEvents.on(AppEvent.LogError, logErrorHandler);
 
@@ -1015,7 +999,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage, config]);
+  }, [config]);
 
   useEffect(() => {
     if (ctrlCTimerRef.current) {
@@ -1200,7 +1184,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     // Only update the title if it's different from the last value we set
     if (lastTitleRef.current !== paddedTitle) {
       lastTitleRef.current = paddedTitle;
-      stdout.write(`\x1b]2;${paddedTitle}\x07`);
+      writeToStdout(`\x1b]2;${paddedTitle}\x07`);
     }
     // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
   }, [

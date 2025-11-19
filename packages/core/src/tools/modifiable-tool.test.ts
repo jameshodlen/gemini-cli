@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import * as path from 'node:path';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock dependencies
 const mockOpenDiff = vi.hoisted(() => vi.fn());
@@ -321,7 +322,7 @@ describe('modifyWithEditor', () => {
 
   it('should handle temp file cleanup errors gracefully', async () => {
     const consoleErrorSpy = vi
-      .spyOn(console, 'error')
+      .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {
       throw new Error('Failed to delete file');

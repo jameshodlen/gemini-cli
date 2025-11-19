@@ -122,6 +122,19 @@ vi.mock('./utils/mouse.js', () => ({
   enableMouseEvents: vi.fn(),
   disableMouseEvents: vi.fn(),
 }));
+vi.mock('../utils/stdio.js', () => ({
+  writeToStdout: vi.fn((...args) =>
+    process.stdout.write(...(args as Parameters<typeof process.stdout.write>)),
+  ),
+  writeToStderr: vi.fn((...args) =>
+    process.stderr.write(...(args as Parameters<typeof process.stderr.write>)),
+  ),
+  patchStdio: vi.fn(() => () => {}),
+  createInkStdio: vi.fn(() => ({
+    stdout: process.stdout,
+    stderr: process.stderr,
+  })),
+}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -149,6 +162,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
+import { writeToStdout } from '../utils/stdio.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -886,7 +900,7 @@ describe('AppContainer State Management', () => {
   describe('Terminal Title Update Feature', () => {
     beforeEach(() => {
       // Reset mock stdout for each test
-      mockStdout = { write: vi.fn() };
+      (writeToStdout as Mock).mockClear();
     });
 
     it('should not update terminal title when showStatusInTitle is false', () => {
@@ -909,9 +923,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -936,9 +951,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -974,9 +990,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with thought subject
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1014,9 +1031,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with default Idle text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
@@ -1055,9 +1073,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with confirmation text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1096,9 +1115,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title is padded to exactly 80 characters
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
       const expectedTitle = shortTitle.padEnd(80, ' ');
@@ -1141,9 +1161,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that the correct ANSI escape sequence is used
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
@@ -1183,9 +1204,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with CLI_TITLE value
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = (writeToStdout as Mock).mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
@@ -1534,7 +1556,7 @@ describe('AppContainer State Management', () => {
       if (shouldEnable) {
         it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
           await setupCopyModeTest(isAlternateMode);
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Turn it on (disable mouse)
           act(() => {
@@ -1586,7 +1608,7 @@ describe('AppContainer State Management', () => {
           });
           rerender();
 
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Press any other key
           act(() => {

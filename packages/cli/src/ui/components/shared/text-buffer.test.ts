@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
-import { renderHook } from '../../../test-utils/render.js';
+import { renderHookWithProviders } from '../../../test-utils/render.js';
 import type {
   Viewport,
   TextBuffer,
@@ -376,7 +376,7 @@ describe('useTextBuffer', () => {
 
   describe('Initialization', () => {
     it('should initialize with empty text and cursor at (0,0) by default', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const state = getBufferState(result);
@@ -390,7 +390,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should initialize with provided initialText', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello',
           viewport,
@@ -407,7 +407,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should initialize with initialText and initialCursorOffset', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello\nworld',
           initialCursorOffset: 7, // Should be at 'o' in 'world'
@@ -426,7 +426,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should wrap visual lines', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'The quick brown fox jumps over the lazy dog.',
           initialCursorOffset: 2, // After '好'
@@ -444,7 +444,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should wrap visual lines with multiple spaces', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'The  quick  brown fox    jumps over the lazy dog.',
           viewport: { width: 15, height: 4 },
@@ -464,7 +464,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should wrap visual lines even without spaces', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: '123456789012345ABCDEFG', // 4 chars, 12 bytes
           viewport: { width: 15, height: 2 },
@@ -479,7 +479,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should initialize with multi-byte unicode characters and correct cursor offset', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: '你好世界', // 4 chars, 12 bytes
           initialCursorOffset: 2, // After '好'
@@ -499,7 +499,7 @@ describe('useTextBuffer', () => {
 
   describe('Basic Editing', () => {
     it('insert: should insert a character and update cursor', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() => result.current.insert('a'));
@@ -516,7 +516,7 @@ describe('useTextBuffer', () => {
     });
 
     it('insert: should insert text in the middle of a line', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'abc',
           viewport,
@@ -531,7 +531,7 @@ describe('useTextBuffer', () => {
     });
 
     it('newline: should create a new line and move cursor', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
@@ -550,7 +550,7 @@ describe('useTextBuffer', () => {
     });
 
     it('backspace: should delete char to the left or merge lines', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'a\nb',
           viewport,
@@ -578,7 +578,7 @@ describe('useTextBuffer', () => {
     });
 
     it('del: should delete char to the right or merge lines', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'a\nb',
           viewport,
@@ -603,7 +603,7 @@ describe('useTextBuffer', () => {
 
   describe('Drag and Drop File Paths', () => {
     it('should prepend @ to a valid file path on insert', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const filePath = '/path/to/a/valid/file.txt';
@@ -612,7 +612,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should not prepend @ to an invalid file path on insert', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const notAPath = 'this is just some long text';
@@ -621,7 +621,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle quoted paths', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const filePath = "'/path/to/a/valid/file.txt'";
@@ -630,7 +630,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should not prepend @ to short text that is not a path', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => true }),
       );
       const shortText = 'ab';
@@ -641,7 +641,7 @@ describe('useTextBuffer', () => {
 
   describe('Shell Mode Behavior', () => {
     it('should not prepend @ to valid file paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => true,
@@ -654,7 +654,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should not prepend @ to quoted paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => true,
@@ -667,7 +667,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should behave normally with invalid paths when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -680,7 +680,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should behave normally with short text when shellModeActive is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => true,
@@ -701,7 +701,7 @@ describe('useTextBuffer', () => {
       // "line1" (5)
       // "next " (5)
       // "line2" (5)
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'long line1next line2', // Corrected: was 'long line1next line2'
           viewport: { width: 5, height: 4 },
@@ -728,7 +728,7 @@ describe('useTextBuffer', () => {
 
     it('move: up/down should preserve preferred visual column', () => {
       const text = 'abcde\nxy\n12345';
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: text,
           viewport,
@@ -770,7 +770,7 @@ describe('useTextBuffer', () => {
 
     it('move: home/end should go to visual line start/end', () => {
       const initialText = 'line one\nsecond line';
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText,
           viewport: { width: 5, height: 5 },
@@ -799,7 +799,7 @@ describe('useTextBuffer', () => {
 
   describe('Visual Layout & Viewport', () => {
     it('should wrap long lines correctly into visualLines', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'This is a very long line of text.', // 33 chars
           viewport: { width: 10, height: 5 },
@@ -820,7 +820,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should update visualScrollRow when visualCursor moves out of viewport', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'l1\nl2\nl3\nl4\nl5',
           viewport: { width: 5, height: 3 }, // Can show 3 visual lines
@@ -870,7 +870,7 @@ describe('useTextBuffer', () => {
 
   describe('Undo/Redo', () => {
     it('should undo and redo an insert operation', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() => result.current.insert('a'));
@@ -886,7 +886,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should undo and redo a newline operation', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'test',
           viewport,
@@ -909,7 +909,7 @@ describe('useTextBuffer', () => {
 
   describe('Unicode Handling', () => {
     it('insert: should correctly handle multi-byte unicode characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() => result.current.insert('你好'));
@@ -920,7 +920,7 @@ describe('useTextBuffer', () => {
     });
 
     it('backspace: should correctly delete multi-byte unicode characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: '你好',
           viewport,
@@ -940,7 +940,7 @@ describe('useTextBuffer', () => {
     });
 
     it('move: left/right should treat multi-byte chars as single units for visual cursor', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: '🐶🐱',
           viewport: { width: 5, height: 1 },
@@ -967,7 +967,7 @@ describe('useTextBuffer', () => {
 
   describe('handleInput', () => {
     it('should insert printable characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() =>
@@ -996,7 +996,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle "Enter" key as newline', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() =>
@@ -1014,7 +1014,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should do nothing for a tab key press', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() =>
@@ -1032,7 +1032,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should do nothing for a shift tab key press', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() =>
@@ -1050,7 +1050,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle "Backspace" key', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'a',
           viewport,
@@ -1073,7 +1073,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle multiple delete characters in one input', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
@@ -1117,7 +1117,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle inserts that contain delete characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
@@ -1135,7 +1135,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle inserts with a mix of regular and delete characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'abcde',
           viewport,
@@ -1153,7 +1153,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle arrow keys for movement', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
@@ -1188,7 +1188,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should strip ANSI escape codes when pasting text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
@@ -1208,7 +1208,7 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle VSCode terminal Shift+Enter as newline', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() =>
@@ -1234,7 +1234,7 @@ It is a long established fact that a reader will be distracted by the readable c
 Where does it come from?
 Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lore
 `;
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
 
@@ -1268,7 +1268,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
   describe('replaceRange', () => {
     it('should replace a single-line range with single-line text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: '@pac',
           viewport,
@@ -1282,7 +1282,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should replace a multi-line range with single-line text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello\nworld\nagain',
           viewport,
@@ -1296,7 +1296,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should delete a range when replacing with an empty string', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello world',
           viewport,
@@ -1310,7 +1310,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should handle replacing at the beginning of the text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'world',
           viewport,
@@ -1324,7 +1324,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should handle replacing at the end of the text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello',
           viewport,
@@ -1338,7 +1338,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should handle replacing the entire buffer content', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'old text',
           viewport,
@@ -1352,7 +1352,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should correctly replace with unicode characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'hello *** world',
           viewport,
@@ -1366,7 +1366,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should handle invalid range by returning false and not changing text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'test',
           viewport,
@@ -1386,7 +1386,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('replaceRange: multiple lines with a single character', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'first\nsecond\nthird',
           viewport,
@@ -1400,7 +1400,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should replace a single-line range with multi-line text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'one two three',
           viewport,
@@ -1449,7 +1449,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         desc: 'pasted text with ANSI',
       },
     ])('should strip $desc from input', ({ input, expected }) => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       act(() => result.current.handleInput(createInput(input)));
@@ -1457,7 +1457,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not strip standard characters or newlines', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const validText = 'Hello World\nThis is a test.';
@@ -1466,7 +1466,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const unsafeChars = '\x07\x08\x0B\x0C';
@@ -1497,7 +1497,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should sanitize large ANSI text (>5000 chars) and strip escape codes', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const largeTextWithAnsi =
@@ -1531,7 +1531,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not strip popular emojis', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const emojis = '🐍🐳🦀🦄';
@@ -1552,7 +1552,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
   describe('inputFilter', () => {
     it('should filter input based on the provided filter function', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1565,7 +1565,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should handle empty result from filter', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1578,7 +1578,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should filter pasted text', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1591,7 +1591,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not filter newlines if they are allowed by the filter', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1606,7 +1606,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should filter before newline check in insert', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1645,7 +1645,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       // We pass a stable `isValidPath` so that callbacks that depend on it
       // are not recreated on every render.
       const isValidPath = () => false;
-      const { result, rerender } = renderHook(() =>
+      const { result, rerender } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath }),
       );
 
@@ -1664,7 +1664,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
     it('should have memoized actions that operate on the latest state', () => {
       const isValidPath = () => false;
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({ viewport, isValidPath }),
       );
 
@@ -1689,7 +1689,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
   describe('singleLine mode', () => {
     it('should not insert a newline character when singleLine is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1703,7 +1703,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not create a new line when newline() is called and singleLine is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           initialText: 'ab',
           viewport,
@@ -1720,7 +1720,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not handle "Enter" key as newline when singleLine is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1742,7 +1742,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should not print anything for function keys when singleLine is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
@@ -1764,7 +1764,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     });
 
     it('should strip newlines from pasted text when singleLine is true', () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useTextBuffer({
           viewport,
           isValidPath: () => false,
